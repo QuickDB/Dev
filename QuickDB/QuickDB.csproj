@@ -1,0 +1,88 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{5A725DD5-B690-4647-9786-63EDAE7AF9BE}</ProjectGuid>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>QuickDB</RootNamespace>
+    <AssemblyName>QuickDB</AssemblyName>
+    <TargetFrameworkVersion>v3.5</TargetFrameworkVersion>
+    <FileAlignment>512</FileAlignment>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\Debug\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\Release\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="Newtonsoft.Json, Version=6.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\packages\Newtonsoft.Json.6.0.3\lib\net35\Newtonsoft.Json.dll</HintPath>
+    </Reference>
+    <Reference Include="System" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Xml" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="Core\Models\DocumentState.cs" />
+    <Compile Include="Core\Core\CoreQuickDB.cs" />
+    <Compile Include="Core\Models\AConfigurationObject.cs" />
+    <Compile Include="Core\Models\IQuickDBSession.cs" />
+    <Compile Include="Core\Models\QuickDBDependencySetUpObject.cs" />
+    <Compile Include="Core\QuickDBException\QuickDBTryingToCreateAnAlreadyExistingDocumentException.cs" />
+    <Compile Include="Core\QuickDBException\QuickDBTryingToReadNonExistentDocumentException.cs" />
+    <Compile Include="Rules\StorageRulesFactory.cs" />
+    <Compile Include="DependencyInjector\DependencyMaping.cs" />
+    <Compile Include="DependencyInjector\QDBInjector.cs" />
+    <Compile Include="DependencyMapProvider\DefaultDependencyProvider.cs" />
+    <Compile Include="DependencyInjector\WhenDependencyRequestedIs.cs" />
+    <Compile Include="DependencyMapProvider\DependencySettings.cs" />
+    <Compile Include="Instances\QuickDB.cs" />
+    <Compile Include="Core\QuickDBException\QuickDBErrorDeletingDocumentException.cs" />
+    <Compile Include="Core\QuickDBException\QuickDBMaximumNumberOfRetrrDocumentWriteExceededException.cs" />
+    <Compile Include="Core\QuickDBException\QuickDBPermanentDocumentDeleteException.cs" />
+    <Compile Include="Core\QuickDBException\QuickDBTryingToWriteToAReadOnlyDocumentException.cs" />
+    <Compile Include="Core\QuickDBException\QuickDBUnSafeDocumentWriteException.cs" />
+    <Compile Include="Core\SessionBackBones\QuickDBFor.cs" />
+    <Compile Include="Core\Session\QuickDBSession.cs" />
+    <Compile Include="Dependencies\Contracts\AbstractEncryptionHandler.cs" />
+    <Compile Include="Dependencies\Encryptions\EncryptionHandler.cs" />
+    <Compile Include="Dependencies\Contracts\AbstractFileAccessHandler.cs" />
+    <Compile Include="Dependencies\FileIO\FileAccess.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Dependencies\Contracts\AbstractSerializationHandler.cs" />
+    <Compile Include="Dependencies\Serializations\JSonSerializationHandler.cs" />
+    <Compile Include="Dependencies\SecuritySettings\DefaultSecurityStrings.cs" />
+    <Compile Include="Core\Models\SecurityStrings.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup />
+  <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>
