@@ -12,8 +12,24 @@ namespace QuickDB.Core.SessionBackBones
     {
         public bool IsNew { set; get; }
         protected ADocumentObject<TDocumentObject> DocumentVersion { set; get; }
-
         protected string RawDocumentVersion { set; get; }
+        protected string RawModelDocumentVersion { set; get; }
+
+
+
+        public string RawModelData
+        {
+            get
+            {
+                RawDocumentVersion = ConfigHandle.LoadRawDocument();
+                return RawDocumentVersion;
+            }
+        }
+
+
+
+
+
         public bool ReadOnly { set; get; }
 
         public TDocumentObject Data

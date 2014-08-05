@@ -103,10 +103,18 @@ namespace QuickDB.Core.Core
             {
                 if (FileAccessHandler.Exists())
                 {
-                    throw new QuickDBTryingToCreateAnAlreadyExistingDocumentException();
+                    //todo :
+                    //throw new QuickDBTryingToCreateAnAlreadyExistingDocumentException();
                 }
-                FileAccessHandler.CreateRequiredDirectoryIfItDoesntAlreadyExist();
+                else
+                {
+
+     FileAccessHandler.CreateRequiredDirectoryIfItDoesntAlreadyExist();
                 FileAccessHandler.CreateRequiredFileIfItDoesntAlreadyExist();
+                }
+
+
+           
             }
 
             if (!FileAccessHandler.Exists())

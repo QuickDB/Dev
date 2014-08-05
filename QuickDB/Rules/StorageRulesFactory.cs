@@ -7,7 +7,7 @@ namespace QuickDB.Rules
         public static AccessHandlerRules CreateAccessHandlerRules(string fileName,string documentId)
         {
             documentId = string.IsNullOrEmpty(documentId) ? "" : documentId + "_";
-            const string mainDirectory = "QuickDB";
+             string mainDirectory =System.Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments) +@"\QuickDB";
             const string documentExtention = "qdb";
             var documentName = documentId+fileName + "_Document";
             var tableDirectoryName = fileName;

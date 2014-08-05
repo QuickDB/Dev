@@ -20,11 +20,16 @@ namespace QuickDB.Core.Session
         private TConfigurationObject Data { set; get; }
 
         private string RawData { set; get; }
+        private string RawModelData { set; get; }
 
         public SensitiveOPerations Administration = new SensitiveOPerations();
 
         public class SensitiveOPerations
         {
+            public string LoadRawModel(string documentId = null)
+            {
+                return CurrentSession.LoadRawModel(documentId);
+            }
             public void DeleteDocumentPermanently(string documentId = null)
             {
                 CurrentSession.DeleteDocumentPermanently(documentId);
@@ -40,6 +45,8 @@ namespace QuickDB.Core.Session
                 CurrentSession.SaveRawChanges();
             }
         }
+
+
 
         private void DeleteDocumentPermanently(string documentId = null)
         {
@@ -73,6 +80,13 @@ namespace QuickDB.Core.Session
             Context = new QuickDBFor<TConfigurationObject>(null, documentId, EnableEncryption, ReadOnly);
             Data = Context.Data;
             return Data;
+        }
+
+        private string LoadRawModel(string documentId = null)
+        {
+            Context = new QuickDBFor<TConfigurationObject>(null, documentId, EnableEncryption, ReadOnly);
+            RawModelData = Context.RawModelData;
+            return RawModelData;
         }
 
         private string LoadRaw(string documentId = null)

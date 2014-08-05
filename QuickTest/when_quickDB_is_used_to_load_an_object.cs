@@ -27,7 +27,7 @@ namespace QuickTest
             using (var session = new QuickDBSessionFor<Order>())
             {
                 //load default instance,creating new
-                var order = session.LoadNew();
+                var order = session.LoadAndCreateIfItDoesntExist();
 
                 //Acts
                 order.OrderItem = item;
@@ -46,7 +46,7 @@ namespace QuickTest
             using (var session = new QuickDBSessionFor<Order>())
             {
                 //load instance based on documentId,creating new
-                var order = session.LoadNew(documentId);
+                var order = session.LoadAndCreateIfItDoesntExist(documentId);
                 order.OrderItem = sampleValue.ToString();
                 order.OrderNumber = sampleValue;
                 session.SaveChanges();
@@ -62,9 +62,9 @@ namespace QuickTest
 
 
            //delete the two documents created
-            var newSession = new QuickDBSessionFor<Order>();
-            newSession.Administration.DeleteDocumentPermanently();
-            newSession.Administration.DeleteDocumentPermanently(documentId);
+            //var newSession = new QuickDBSessionFor<Order>();
+            //newSession.Administration.DeleteDocumentPermanently();
+            //newSession.Administration.DeleteDocumentPermanently(documentId);
 
         }
     }
