@@ -4,7 +4,7 @@ using QuickDB.Core.Models;
 
 namespace QuickDB.Instances
 {
-    public class QuickDB<TConfigurationObject> : CoreQuickDB<TConfigurationObject> where TConfigurationObject : new()
+    public class QuickDB<TClientModelObject> : CoreFacade<TClientModelObject> where TClientModelObject : new()
     {
         public QuickDB(QuickDBDependencySetUpObject quickDBDependencySetUpObject, bool readOnly = false) : base(quickDBDependencySetUpObject, readOnly)
         {

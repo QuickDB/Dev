@@ -1,3 +1,4 @@
+using System;
 using QuickDB.Core.Core;
 using QuickDB.Core.Models;
 using QuickDB.Dependencies.Contracts;
@@ -11,7 +12,7 @@ namespace QuickDB.Core.SessionBackBones
     public class QuickDBFor<TDocumentObject> where TDocumentObject : new()
     {
         public bool IsNew { set; get; }
-        protected ADocumentObject<TDocumentObject> DocumentVersion { set; get; }
+        public ADocumentObject<TDocumentObject> DocumentVersion { set; get; }
         protected string RawDocumentVersion { set; get; }
         protected string RawModelDocumentVersion { set; get; }
 
@@ -27,7 +28,10 @@ namespace QuickDB.Core.SessionBackBones
         }
 
 
-
+        public void TrySaveChanges(Func<ADocumentObject<TDocumentObject>> updateDocumentActionToBeRetried) 
+        {
+            ConfigHandle.TrySave(updateDocumentActionToBeRetried);
+        }
 
 
         public bool ReadOnly { set; get; }
@@ -42,7 +46,7 @@ namespace QuickDB.Core.SessionBackBones
 
                 DocumentVersion.Document = value;
 
-                ConfigHandle.Save(DocumentVersion);
+                ConfigHandle.Save(DocumentVersion,ReadOnly);
             }
             get
             {
@@ -72,9 +76,9 @@ namespace QuickDB.Core.SessionBackBones
 
 
 
-        private CoreQuickDB<TDocumentObject> ConfigHandle { set; get; }
+        public CoreFacade<TDocumentObject> ConfigHandle { set; get; }
 
-        protected void QuickDBFactoryConstructor(CoreQuickDB<TDocumentObject> configHandle,string documentId, bool readOnly = false,
+        protected void QuickDBFactoryConstructor(CoreFacade<TDocumentObject> configHandle, string documentId, bool readOnly = false,
             bool enableEncryption = true, bool createIfItDoesNotExist = false)
         {
 
@@ -103,7 +107,7 @@ namespace QuickDB.Core.SessionBackBones
             ConfigHandle.DeleteDocumentPermanently(ConfigHandle.Load());
         }
 
-        public QuickDBFor(CoreQuickDB<TDocumentObject> configHandle, string documentId = null, bool enableEncryption = true, bool readOnly = false, bool createIfItDoesNotExist = false)
+        public QuickDBFor(CoreFacade<TDocumentObject> configHandle, string documentId = null, bool enableEncryption = true, bool readOnly = false, bool createIfItDoesNotExist = false)
         {
             QuickDBFactoryConstructor(configHandle, documentId, readOnly, enableEncryption, createIfItDoesNotExist);
         }

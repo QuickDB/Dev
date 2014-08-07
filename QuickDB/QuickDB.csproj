@@ -42,13 +42,20 @@
     <Reference Include="System.Xml" />
   </ItemGroup>
   <ItemGroup>
+    <Compile Include="Core\Core\CoreFacade.cs" />
+    <Compile Include="Core\Core\SystemConfig.cs" />
     <Compile Include="Core\Models\DocumentState.cs" />
     <Compile Include="Core\Core\CoreQuickDB.cs" />
-    <Compile Include="Core\Models\AConfigurationObject.cs" />
-    <Compile Include="Core\Models\IQuickDBSession.cs" />
+    <Compile Include="Core\Models\ADocumentObject.cs" />
     <Compile Include="Core\Models\QuickDBDependencySetUpObject.cs" />
+    <Compile Include="Core\QuickDBException\QuickDBFatalAndDataIntegritySeriousException.cs" />
+    <Compile Include="Core\QuickDBException\QuickDBInvalidDocumentException.cs" />
     <Compile Include="Core\QuickDBException\QuickDBTryingToCreateAnAlreadyExistingDocumentException.cs" />
+    <Compile Include="Core\QuickDBException\QuickDBTryingToLoadDeletedDocumentException.cs" />
+    <Compile Include="Core\QuickDBException\QuickDBTryingToLoadDocumentAlreadyInAnExistingTransactionException.cs" />
     <Compile Include="Core\QuickDBException\QuickDBTryingToReadNonExistentDocumentException.cs" />
+    <Compile Include="Core\QuickDBException\QuickDBTryingToSaveADocumentAlreadyInATransactionException.cs" />
+    <Compile Include="Core\QuickDBException\QuickDBUnableToLoadParticipantOfATransactionException.cs" />
     <Compile Include="Rules\StorageRulesFactory.cs" />
     <Compile Include="DependencyInjector\DependencyMaping.cs" />
     <Compile Include="DependencyInjector\QDBInjector.cs" />
@@ -62,7 +69,7 @@
     <Compile Include="Core\QuickDBException\QuickDBTryingToWriteToAReadOnlyDocumentException.cs" />
     <Compile Include="Core\QuickDBException\QuickDBUnSafeDocumentWriteException.cs" />
     <Compile Include="Core\SessionBackBones\QuickDBFor.cs" />
-    <Compile Include="Core\Session\QuickDBSession.cs" />
+    <Compile Include="Core\Session\QuickDBSessionFor.cs" />
     <Compile Include="Dependencies\Contracts\AbstractEncryptionHandler.cs" />
     <Compile Include="Dependencies\Encryptions\EncryptionHandler.cs" />
     <Compile Include="Dependencies\Contracts\AbstractFileAccessHandler.cs" />
@@ -71,7 +78,7 @@
     <Compile Include="Dependencies\Contracts\AbstractSerializationHandler.cs" />
     <Compile Include="Dependencies\Serializations\JSonSerializationHandler.cs" />
     <Compile Include="Dependencies\SecuritySettings\DefaultSecurityStrings.cs" />
-    <Compile Include="Core\Models\SecurityStrings.cs" />
+    <Compile Include="Core\Models\ISecurityStrings.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

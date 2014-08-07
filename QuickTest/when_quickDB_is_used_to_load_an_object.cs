@@ -1,7 +1,7 @@
 ﻿using Microsoft.VisualStudio.TestTools.UnitTesting;
 using QuickDB.Core.Session;
 using System;
-
+//todo : test transaction
 namespace QuickTest
 {
     [TestClass]
@@ -27,7 +27,7 @@ namespace QuickTest
             using (var session = new QuickDBSessionFor<Order>())
             {
                 //load default instance,creating new
-                var order = session.LoadAndCreateIfItDoesntExist();
+                var order = session.LoadNew();
 
                 //Acts
                 order.OrderItem = item;
@@ -46,7 +46,7 @@ namespace QuickTest
             using (var session = new QuickDBSessionFor<Order>())
             {
                 //load instance based on documentId,creating new
-                var order = session.LoadAndCreateIfItDoesntExist(documentId);
+                var order = session.LoadNew(documentId);
                 order.OrderItem = sampleValue.ToString();
                 order.OrderNumber = sampleValue;
                 session.SaveChanges();
@@ -61,10 +61,10 @@ namespace QuickTest
             }
 
 
-           //delete the two documents created
-            //var newSession = new QuickDBSessionFor<Order>();
-            //newSession.Administration.DeleteDocumentPermanently();
-            //newSession.Administration.DeleteDocumentPermanently(documentId);
+        //   delete the two documents created
+            var newSession = new QuickDBSessionFor<Order>();
+            newSession.Administration.DeleteDocumentPermanently();
+            newSession.Administration.DeleteDocumentPermanently(documentId);
 
         }
     }

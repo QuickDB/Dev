@@ -1,3 +1,4 @@
+using QuickDB.Core.Models;
 using QuickDB.Core.QuickDBException;
 using QuickDB.Core.SessionBackBones;
 using QuickDB.DependencyMapProvider;
@@ -5,9 +6,9 @@ using System;
 
 namespace QuickDB.Core.Session
 {
-    public class QuickDBSessionFor<TConfigurationObject> : IDisposable where TConfigurationObject : new()
+    public class QuickDBSessionFor<TClientModelObject> : IDisposable where TClientModelObject : new()
     {
-        private static QuickDBSessionFor<TConfigurationObject> CurrentSession { set; get; }
+        private static QuickDBSessionFor<TClientModelObject> CurrentSession { set; get; }
 
         public QuickDBSessionFor()
         {
@@ -15,11 +16,12 @@ namespace QuickDB.Core.Session
             CurrentSession = this;
         }
 
-        private QuickDBFor<TConfigurationObject> Context { set; get; }
+        private QuickDBFor<TClientModelObject> Context { set; get; }
 
-        private TConfigurationObject Data { set; get; }
+        private TClientModelObject Data { set; get; }
 
         private string RawData { set; get; }
+
         private string RawModelData { set; get; }
 
         public SensitiveOPerations Administration = new SensitiveOPerations();
@@ -30,6 +32,7 @@ namespace QuickDB.Core.Session
             {
                 return CurrentSession.LoadRawModel(documentId);
             }
+
             public void DeleteDocumentPermanently(string documentId = null)
             {
                 CurrentSession.DeleteDocumentPermanently(documentId);
@@ -46,22 +49,20 @@ namespace QuickDB.Core.Session
             }
         }
 
-
-
         private void DeleteDocumentPermanently(string documentId = null)
         {
-            Context = new QuickDBFor<TConfigurationObject>(null, documentId, EnableEncryption, ReadOnly);
+            Context = new QuickDBFor<TClientModelObject>(null, documentId, EnableEncryption, ReadOnly);
             Context.DeleteDocumentPermanently();
         }
 
-        public TConfigurationObject LoadNew(string documentId = null)
+        public TClientModelObject LoadNew(string documentId = null)
         {
-            Context = new QuickDBFor<TConfigurationObject>(null, documentId, EnableEncryption, ReadOnly, true);
+            Context = new QuickDBFor<TClientModelObject>(null, documentId, EnableEncryption, ReadOnly, true);
             Data = Context.Data;
             return Data;
         }
 
-        public TConfigurationObject LoadAndCreateIfItDoesntExist(string documentId = null)
+        public TClientModelObject LoadAndCreateIfItDoesntExist(string documentId = null)
         {
             try
             {
@@ -75,23 +76,23 @@ namespace QuickDB.Core.Session
             }
         }
 
-        public TConfigurationObject Load(string documentId = null)
+        public TClientModelObject Load(string documentId = null)
         {
-            Context = new QuickDBFor<TConfigurationObject>(null, documentId, EnableEncryption, ReadOnly);
+            Context = new QuickDBFor<TClientModelObject>(null, documentId, EnableEncryption, ReadOnly);
             Data = Context.Data;
             return Data;
         }
 
         private string LoadRawModel(string documentId = null)
         {
-            Context = new QuickDBFor<TConfigurationObject>(null, documentId, EnableEncryption, ReadOnly);
+            Context = new QuickDBFor<TClientModelObject>(null, documentId, EnableEncryption, ReadOnly);
             RawModelData = Context.RawModelData;
             return RawModelData;
         }
 
         private string LoadRaw(string documentId = null)
         {
-            Context = new QuickDBFor<TConfigurationObject>(null, documentId, EnableEncryption, ReadOnly);
+            Context = new QuickDBFor<TClientModelObject>(null, documentId, EnableEncryption, ReadOnly);
             RawData = Context.RawData;
             return RawData;
         }
@@ -101,9 +102,27 @@ namespace QuickDB.Core.Session
             Context.RawData = RawData;
         }
 
-        public void SaveChanges()
+        public void SaveChanges(bool saveAsReadOnly = false)
         {
+            Context.ReadOnly = saveAsReadOnly;
             Context.Data = Data;
+        }
+
+        public void TrySaveChanges(Action updateDocumentActionToBeRetried, bool saveAsReadOnly = false)
+        {
+            //todo to move into qdbfor
+            Context.TrySaveChanges(() =>
+            {
+                updateDocumentActionToBeRetried.Invoke();
+                Context.ReadOnly = saveAsReadOnly;
+                if (Context.DocumentVersion == null)
+                    Context.DocumentVersion = new ADocumentObject<TClientModelObject>();
+
+                Context.DocumentVersion.Document = Data;
+
+                Context.ConfigHandle.Save(Context.DocumentVersion, ReadOnly);
+                return Context.DocumentVersion;
+            });
         }
 
         public bool EnableEncryption { set; get; }

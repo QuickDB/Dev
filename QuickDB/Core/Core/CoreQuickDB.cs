@@ -9,9 +9,13 @@ using System.Linq;
 
 namespace QuickDB.Core.Core
 {
-    public abstract class CoreQuickDB<TConfigurationObject> : IQuickDBSession<ADocumentObject<TConfigurationObject>> where TConfigurationObject : new()
+    public abstract class CoreQuickDB<TClientModelObject> where TClientModelObject : new()
     {
-        #region
+        public int MaximumUpdateHistoryDepth { set; get; }
+
+        #region Ctor & Dependencies
+
+        public bool ReadOnly { set; get; }
 
         protected AbstractEncryptionHandler EncryptionHandler { set; get; }
 
@@ -21,228 +25,85 @@ namespace QuickDB.Core.Core
 
         protected bool EnableEncryption { set; get; }
 
-        private void UpdateDocumentHistory(ADocumentObject<TConfigurationObject> updatedDocument, ADocumentObject<TConfigurationObject> currentDocument, int maxHistoryDepth, DateTime stamp)
+        public void VerifyQuickDBDependencySetUp(QuickDBDependencySetUpObject quickDBDependencySetUpObject)
         {
-            if (currentDocument != null)
-            {
-                updatedDocument.UpdateHistory = currentDocument.UpdateHistory ?? new List<ADocumentObject<TConfigurationObject>>();
-
-                if (currentDocument.UpdateHistory != null && currentDocument.UpdateHistory.Count > maxHistoryDepth)
-                {
-                    currentDocument.UpdateHistory = currentDocument.UpdateHistory.OrderBy(x => x.Timestamp)
-                        .Skip(currentDocument.UpdateHistory.Count + 1 - maxHistoryDepth)
-                        .Take(maxHistoryDepth)
-                        .ToList();
-                }
-
-                updatedDocument.UpdateHistory.Add(new ADocumentObject<TConfigurationObject>()
-                {
-                    Document = currentDocument.Document,
-                    DocumentName = currentDocument.DocumentName,
-                    ETag = currentDocument.ETag,
-                    DateCreated = currentDocument.DateCreated,
-                    Timestamp = stamp,
-                    State = currentDocument.State,
-                    Version = currentDocument.Version
-                });
-            }
+            if (quickDBDependencySetUpObject == null) throw new ArgumentNullException();
+            if (quickDBDependencySetUpObject.EncryptionHandler == null) throw new ArgumentNullException();
+            if (quickDBDependencySetUpObject.AbstractSerializationHandler == null) throw new ArgumentNullException();
+            if (quickDBDependencySetUpObject.FileAccessHandler == null) throw new ArgumentNullException();
         }
 
-        private bool EtagHasChangedSinceLastLoad(ADocumentObject<TConfigurationObject> updatedDocument, ADocumentObject<TConfigurationObject> currentDocument)
+        protected CoreQuickDB(QuickDBDependencySetUpObject quickDBDependencySetUpObject, bool readOnly = false)
         {
-            return (currentDocument != null && currentDocument.ETag != updatedDocument.ETag) || (currentDocument == null);
+            MaximumUpdateHistoryDepth = 100;
+            VerifyQuickDBDependencySetUp(quickDBDependencySetUpObject);
+            ReadOnly = readOnly;
+            EnableEncryption = quickDBDependencySetUpObject.EnableEncryption;
+            EncryptionHandler = quickDBDependencySetUpObject.EncryptionHandler;
+            SerializationHandler = quickDBDependencySetUpObject.AbstractSerializationHandler;
+            FileAccessHandler = quickDBDependencySetUpObject.FileAccessHandler;
         }
 
-        private void UpdateDocumentProperties(
-           ADocumentObject<TConfigurationObject> updatedDocument, long version, DateTime stamp)
+        #endregion Ctor & Dependencies
+
+        #region private methods
+
+        #endregion private methods
+
+        #region Main Functions
+
+        protected ADocumentObject<TClientModelObject> _Deserialize(string stringContentInConfigFile)
         {
-            updatedDocument.ETag = Guid.NewGuid();
-            updatedDocument.Timestamp = stamp;
-            updatedDocument.DateCreated = stamp;
-            updatedDocument.Version = version;
-            updatedDocument.State = updatedDocument.State == DocumentState.Unknown ? DocumentState.Valid : updatedDocument.State;
-            updatedDocument.DocumentName = typeof(TConfigurationObject).Name;
+            return SerializationHandler.DeSerialize<ADocumentObject<TClientModelObject>>(stringContentInConfigFile);
         }
 
-        protected ADocumentObject<TConfigurationObject> Deserialize(string stringContentInConfigFile)
+        protected ADocumentObject<TClientModelObject> _DecryptAndDeserialize(string stringContentInConfigFile)
         {
-            return SerializationHandler.DeSerialize<ADocumentObject<TConfigurationObject>>(stringContentInConfigFile);
+            return _Deserialize(EncryptionHandler.DeCrypt(stringContentInConfigFile));
         }
 
-        protected ADocumentObject<TConfigurationObject> DecryptAndDeserialize(string stringContentInConfigFile)
-        {
-            return Deserialize(EncryptionHandler.DeCrypt(stringContentInConfigFile));
-        }
-
-        protected ADocumentObject<TConfigurationObject> TryDeserializeStrategies(string stringContentInConfigFile)
+        protected ADocumentObject<TClientModelObject> _TryDeserializeStrategies(string stringContentInConfigFile)
         {
             var tmpStringContent = stringContentInConfigFile;
             try
             {
                 if (EnableEncryption)
-                    return DecryptAndDeserialize(tmpStringContent);
+                    return _DecryptAndDeserialize(tmpStringContent);
 
-                return Deserialize(tmpStringContent);
+                return _Deserialize(tmpStringContent);
             }
             catch (Exception)
             {
                 try
                 {
-                    return Deserialize(tmpStringContent);
+                    return _Deserialize(tmpStringContent);
                 }
                 catch (Exception)
                 {
-                    return DecryptAndDeserialize(tmpStringContent);
+                    return _DecryptAndDeserialize(tmpStringContent);
                 }
             }
-        }
-
-        protected string _LoadRaw(bool decrypt = false, bool createIfItDoesNotExist = false)
-        {
-            if (createIfItDoesNotExist)
-            {
-                if (FileAccessHandler.Exists())
-                {
-                    //todo :
-                    //throw new QuickDBTryingToCreateAnAlreadyExistingDocumentException();
-                }
-                else
-                {
-
-     FileAccessHandler.CreateRequiredDirectoryIfItDoesntAlreadyExist();
-                FileAccessHandler.CreateRequiredFileIfItDoesntAlreadyExist();
-                }
-
-
-           
-            }
-
-            if (!FileAccessHandler.Exists())
-                throw new QuickDBTryingToReadNonExistentDocumentException();
-
-            var result = FileAccessHandler.Read();
-
-            if (string.IsNullOrEmpty(result))
-            {
-                result = UpdateDocumentPropertiesAndSaveToDisc(new ADocumentObject<TConfigurationObject>(), 0, DateTime.UtcNow);
-            }
-
-            if (decrypt)
-                result = EncryptionHandler.DeCrypt(result);
-            return result;
-        }
-
-        protected ADocumentObject<TConfigurationObject> _Load(string raw = null, bool createIfItDoesNotExist = false)
-        {
-            try
-            {
-                var result = TryDeserializeStrategies(raw ?? _LoadRaw(false, createIfItDoesNotExist));
-                result.Document = result.Document == null ? new TConfigurationObject() : result.Document;
-
-                return result;
-            }
-            catch (Exception e)
-            {
-                if (e is QuickDBTryingToReadNonExistentDocumentException)
-                    throw;
-
-                if (e is QuickDBTryingToCreateAnAlreadyExistingDocumentException)
-                    throw;
-
-                return null;
-            }
-        }
-
-        protected string _Save(ADocumentObject<TConfigurationObject> updatedDocument, bool throwExceptionIfThereAreChangesSinceLastLoad = false, int maxHistoryDepth = 100)
-        {
-            FileAccessHandler.CreateRequiredDirectoryIfItDoesntAlreadyExist();
-            FileAccessHandler.CreateRequiredFileIfItDoesntAlreadyExist();
-
-            var raw = _LoadRaw();
-            var currentDocument = _Load(raw);
-            var etagHasChangedSinceLastLoad = EtagHasChangedSinceLastLoad(updatedDocument, currentDocument);
-
-            if (throwExceptionIfThereAreChangesSinceLastLoad && etagHasChangedSinceLastLoad)
-            {
-                throw new QuickDBUnSafeDocumentWriteException("Document has been modified since last load with . Please reload the document before trying to save");
-            }
-            var stamp = DateTime.UtcNow;
-
-            UpdateDocumentHistory(updatedDocument, currentDocument, maxHistoryDepth, stamp);
-
-            long version;
-            try
-            {
-                version = currentDocument.Version + 1;
-            }
-            catch (Exception)
-            {
-                version = 0;
-            }
-            return UpdateDocumentPropertiesAndSaveToDisc(updatedDocument, version, stamp);
-        }
-
-        private string UpdateDocumentPropertiesAndSaveToDisc(
-           ADocumentObject<TConfigurationObject> updatedDocument, long version, DateTime stamp)
-        {
-            UpdateDocumentProperties(updatedDocument, version, stamp);
-
-            updatedDocument.Document = updatedDocument.Document.Equals(null) ? new TConfigurationObject() : updatedDocument.Document;
-            var json = SerializationHandler.Serialize(updatedDocument);
-
-            if (EnableEncryption)
-                json = EncryptionHandler.EnCrypt(json);
-
-            FileAccessHandler.Save(json);
-
-            return json;
         }
 
         protected void _SaveRaw(string json)
         {
+            if (ReadOnly) throw new QuickDBTryingToWriteToAReadOnlyDocumentException();
             if (EnableEncryption)
                 json = EncryptionHandler.EnCrypt(json);
 
             FileAccessHandler.Save(json);
         }
 
-        protected void _TrySave(Func<ADocumentObject<TConfigurationObject>> updateDocumentActionToBeRetried, int numberOfRetries = 0, int intervalBetweenRetries = 100)
+        protected void _Delete(ADocumentObject<TClientModelObject> updatedDocument)
         {
-            if (numberOfRetries < 0) throw new ArgumentException("numberOfRetries cannot be negative");
-
-            if (ReadOnly) throw new QuickDBTryingToWriteToAReadOnlyDocumentException(" 'ReadOnly' is True and prevents document from being updated");
-
-            var retryCount = 0;
-            bool saved = false;
-            while ((retryCount <= numberOfRetries))
-            {
-                try
-                {
-                    var data = updateDocumentActionToBeRetried.Invoke();
-                    _Save(data, true);
-                    saved = true;
-                    break;
-                }
-                catch (Exception e)
-                {
-                    if (!(e is QuickDBUnSafeDocumentWriteException)) throw e;
-                    System.Threading.Thread.Sleep(intervalBetweenRetries);
-                    retryCount++;
-                }
-            }
-            if (!saved)
-                throw new QuickDBMaximumNumberOfRetrrDocumentWriteExceededException("Number of retries is " + numberOfRetries);
-        }
-
-        protected void _Delete(ADocumentObject<TConfigurationObject> updatedDocument)
-        {
+            if (ReadOnly) throw new QuickDBTryingToWriteToAReadOnlyDocumentException();
             try
             {
                 _TrySave(() =>
                 {
                     updatedDocument.State = DocumentState.Deleted;
                     return updatedDocument;
-                }, 10);
+                });
             }
             catch (Exception)
             {
@@ -250,8 +111,9 @@ namespace QuickDB.Core.Core
             }
         }
 
-        protected void _DeleteDocumentPermanently(ADocumentObject<TConfigurationObject> updatedDocument)
+        protected void _DeleteDocumentPermanently(ADocumentObject<TClientModelObject> updatedDocument)
         {
+           if (ReadOnly) throw new QuickDBTryingToWriteToAReadOnlyDocumentException();
             var permanentDeleteException = new QuickDBPermanentDocumentDeleteException();
             try
             {
@@ -270,97 +132,290 @@ namespace QuickDB.Core.Core
             }
         }
 
-        #endregion
-        #region Ctor
+        #endregion Main Functions
 
-        public void VerifyQuickDBDependencySetUp(QuickDBDependencySetUpObject QuickDBDependencySetUpObject)
+        #region Critical Points
+
+        private bool _handleCheckIfEtagHasChangedSinceLastLoad(ADocumentObject<TClientModelObject> updatedDocument, ADocumentObject<TClientModelObject> currentDocument, bool throwExceptionIfThereAreChangesSinceLastLoad)
         {
-            if (QuickDBDependencySetUpObject == null) throw new ArgumentNullException("QuickDBDependencySetUpObject");
-            if (QuickDBDependencySetUpObject.EncryptionHandler == null) throw new ArgumentNullException("encryptionHandler");
-            if (QuickDBDependencySetUpObject.AbstractSerializationHandler == null) throw new ArgumentNullException("abstractSerializationHandler");
-            if (QuickDBDependencySetUpObject.FileAccessHandler == null) throw new ArgumentNullException("fileAccessHandler");
+            var etagHasChangedSinceLastLoad = (currentDocument != null && currentDocument.ETag != updatedDocument.ETag) || (currentDocument == null);
+
+            if (throwExceptionIfThereAreChangesSinceLastLoad && etagHasChangedSinceLastLoad)
+            {
+                throw new QuickDBUnSafeDocumentWriteException("Document has been modified since last load with . Please reload the document before trying to save");
+            }
+
+            return etagHasChangedSinceLastLoad;
         }
 
-        protected CoreQuickDB(QuickDBDependencySetUpObject QuickDBDependencySetUpObject, bool readOnly = false)
+        protected string _CreateNewDocument(bool makeDocumentReadOnly = false)
         {
-            ReadOnly = readOnly;
-            VerifyQuickDBDependencySetUp(QuickDBDependencySetUpObject);
-            EnableEncryption = QuickDBDependencySetUpObject.EnableEncryption;
-            EncryptionHandler = QuickDBDependencySetUpObject.EncryptionHandler;
-            SerializationHandler = QuickDBDependencySetUpObject.AbstractSerializationHandler;
-            FileAccessHandler = QuickDBDependencySetUpObject.FileAccessHandler;
+            if (FileAccessHandler.Exists())
+            {
+                throw new QuickDBTryingToCreateAnAlreadyExistingDocumentException();
+            }
+            FileAccessHandler.CreateRequiredDirectoryIfItDoesntAlreadyExist();
+            FileAccessHandler.CreateRequiredFileIfItDoesntAlreadyExist();
 
-            //FileAccessHandler.CreateRequiredDirectoryIfItDoesntAlreadyExist();
-            //FileAccessHandler.CreateRequiredFileIfItDoesntAlreadyExist();
+            var docId = Guid.NewGuid();
+            var doc = _UpdateDocumentPropertiesAndSaveToDisc(new ADocumentObject<TClientModelObject>(docId), 0, DateTime.UtcNow, makeDocumentReadOnly);
+            return doc;
         }
 
-        #endregion
-
-        public string LoadRaw()
+        protected string _LoadRaw(bool decrypt = false, bool createIfItDoesNotExist = false)
         {
-            return SerializationHandler.Serialize(_Load());
+            if (createIfItDoesNotExist)
+            {
+                _CreateNewDocument();
+            }
+
+            if (!FileAccessHandler.Exists())
+            {
+                throw new QuickDBTryingToReadNonExistentDocumentException();
+            }
+
+            var result = FileAccessHandler.Read();
+
+            if (string.IsNullOrEmpty(result))
+            {
+                throw new NotImplementedException();
+            }
+
+            if (decrypt)
+            {
+                result = EncryptionHandler.DeCrypt(result);
+            }
+
+            return result;
         }
 
-        public string LoadRawDocument()
-        {
-            return SerializationHandler.Serialize(_Load().Document);
-        }
+        #endregion Critical Points
 
-        public string LoadRawDocumentSettings()
-        {
-            var obj = _Load();
-            obj.Document = default(TConfigurationObject);
-            obj.UpdateHistory = null;
-            return SerializationHandler.Serialize(obj);
-        }
+        #region Document Updates methods
 
-        public string LoadRawDocumentHistory()
-        {
-            return SerializationHandler.Serialize(_Load().UpdateHistory);
-        }
-
-        public ADocumentObject<TConfigurationObject> Load(bool createIfItDoesNotExist = false)
-        {
-            return _Load(null, createIfItDoesNotExist);
-        }
-
-        public void DeleteDocumentPermanently(ADocumentObject<TConfigurationObject> data)
-        {
-            if (ReadOnly) throw new QuickDBTryingToWriteToAReadOnlyDocumentException();
-
-            _DeleteDocumentPermanently(data);
-        }
-
-        public void Delete(ADocumentObject<TConfigurationObject> data)
-        {
-            if (ReadOnly) throw new QuickDBTryingToWriteToAReadOnlyDocumentException();
-
-            _Delete(data);
-        }
-
-        public void SaveRaw(string data)
+        protected void _TrySave(Func<ADocumentObject<TClientModelObject>> updateDocumentActionToBeRetried, bool makeReadOnly = false, int numberOfRetries = 0, int intervalBetweenRetries = 100,Guid? transactionOwned=null)
         {
             if (ReadOnly) throw new QuickDBTryingToWriteToAReadOnlyDocumentException();
 
-            _SaveRaw(data);
+            if (ReadOnly) throw new QuickDBTryingToWriteToAReadOnlyDocumentException(" 'ReadOnly' is True and prevents document from being updated");
+            if (numberOfRetries < 0) throw new ArgumentException("numberOfRetries cannot be negative");
+
+            var retryCount = 0;
+            var saved = false;
+            while ((retryCount <= numberOfRetries))
+            {
+                try
+                {
+                    var data = updateDocumentActionToBeRetried.Invoke();
+
+                    _Save(data, makeReadOnly, true, transactionOwned);
+                    saved = true;
+                    break;
+                }
+                catch (Exception e)
+                {
+                    if (!(e is QuickDBUnSafeDocumentWriteException))
+                        if (!(e is QuickDBTryingToSaveADocumentThatIsAlreadyInATransactionException))
+                        throw e;
+
+                    System.Threading.Thread.Sleep(intervalBetweenRetries);
+                    retryCount++;
+                }
+            }
+            if (!saved)
+                throw new QuickDBMaximumNumberOfRetrrDocumentWriteExceededException("Number of retries is " + numberOfRetries);
         }
 
-        public void Save(ADocumentObject<TConfigurationObject> data)
+        private void _UpdateDocumentHistory(ADocumentObject<TClientModelObject> updatedDocument, ADocumentObject<TClientModelObject> currentDocument, DateTime stamp)
+        {
+            if (updatedDocument.ReadOnlyDocument)
+                throw new QuickDBTryingToWriteToAReadOnlyDocumentException();
+
+            if (ReadOnly)
+                throw new QuickDBTryingToWriteToAReadOnlyDocumentException();
+
+            if (currentDocument != null)
+            {
+                updatedDocument.UpdateHistory = currentDocument.UpdateHistory ?? new List<ADocumentObject<TClientModelObject>>();
+
+                if (currentDocument.UpdateHistory != null && currentDocument.UpdateHistory.Count > MaximumUpdateHistoryDepth)
+                {
+                    currentDocument.UpdateHistory = currentDocument.UpdateHistory.OrderBy(x => x.Timestamp)
+                        .Skip(currentDocument.UpdateHistory.Count + 1 - MaximumUpdateHistoryDepth)
+                        .Take(MaximumUpdateHistoryDepth)
+                        .ToList();
+                }
+
+                updatedDocument.UpdateHistory.Add(new ADocumentObject<TClientModelObject>()
+                {
+                    Document = currentDocument.Document,
+                    DocumentName = currentDocument.DocumentName,
+                    ETag = currentDocument.ETag,
+                    DateCreated = currentDocument.DateCreated,
+                    Timestamp = stamp,
+                    State = currentDocument.State,
+                    Version = currentDocument.Version
+                });
+            }
+        }
+
+        private void _UpdateDocumentProperties(ADocumentObject<TClientModelObject> updatedDocument, long version, DateTime stamp, bool makeReadOnly = false)
+        {
+            if (updatedDocument.ReadOnlyDocument)
+            {
+                throw new QuickDBTryingToWriteToAReadOnlyDocumentException();
+            }
+
+            if (ReadOnly)
+            {
+                throw new QuickDBTryingToWriteToAReadOnlyDocumentException();
+            }
+            if (updatedDocument.ID == null)
+            {
+                throw new NotImplementedException();
+            }
+
+            updatedDocument.ReadOnlyDocument = makeReadOnly;
+            updatedDocument.ETag = Guid.NewGuid();
+            updatedDocument.Timestamp = stamp;
+            updatedDocument.DateCreated = stamp;
+            updatedDocument.Version = version;
+            updatedDocument.State = updatedDocument.State == DocumentState.Unknown ? DocumentState.Valid : updatedDocument.State;
+            updatedDocument.DocumentName = typeof(TClientModelObject).Name;
+        }
+
+        #endregion Document Updates methods
+
+        #region Main Load and save
+
+        protected ADocumentObject<TClientModelObject> _Load(string raw = null, bool createIfItDoesNotExist = false,Guid? transactionOwned=null)
+        {
+            try
+            {
+                if (raw == null)
+                {
+                    raw = _LoadRaw(decrypt: false, createIfItDoesNotExist: createIfItDoesNotExist);
+                }
+                var result = _TryDeserializeStrategies(raw);
+    var foundEmptyExistingFile = (result.Document == null);
+
+                result.Document = foundEmptyExistingFile ? new TClientModelObject() : result.Document;
+                if (result.ID == null)
+                {
+                    throw new QuickDBInvalidDocumentException();
+                }
+
+                if (result.State == DocumentState.Deleted)
+                {
+                    throw  new QuickDBTryingToLoadDeletedDocumentException();
+                }
+
+            
+
+                if(  (transactionOwned != null)&&raw!=null)
+                {
+                    throw new Exception("cannot do a transaction when default raw data is supplied");
+                }
+
+                //if doc has been set with transaction
+                if (result.TransactionId != null)
+                {
+                    if (result.TransactionId != transactionOwned)
+                    {
+                        throw new QuickDBTryingToEnterIntoTransactionWithADocumentAlreadyInAnExistingTransactionException();
+                    }
+                }
+                else // if no existing transaction on doc
+                {
+                    // and if a transaction is requested
+                    if (transactionOwned == null) return result;
+                    // try to enter into a transaction
+                    try
+                    {
+                        var result1 = result;
+                        result1.TransactionId = transactionOwned;
+                        _TrySave(() => result1,false,100,100, transactionOwned);
+                    }
+                    catch (Exception)
+                    {
+                        throw new QuickDBUnableToLoadParticipantOfATransactionException();
+                    }
+                    try
+                    {
+                         result = _Load();
+                    }
+                    catch (Exception)
+                    {
+                        // this file should be locked down for recovery
+                        throw new QuickDBFatalAndDataIntegritySeriousException();
+                    }
+                   
+                }
+
+
+
+                return result;
+            }
+            catch (Exception e)
+            {
+                if (e is QuickDBTryingToLoadDeletedDocumentException)
+                    throw;
+
+                if (e is QuickDBTryingToReadNonExistentDocumentException)
+                    throw;
+
+                if (e is QuickDBTryingToCreateAnAlreadyExistingDocumentException)
+                    throw;
+
+                return null;
+            }
+        }
+
+        protected string _Save(ADocumentObject<TClientModelObject> updatedDocument, bool makeReadOnly = false, bool throwExceptionIfThereAreChangesSinceLastLoad = false,Guid? transactionOwned=null)
         {
             if (ReadOnly) throw new QuickDBTryingToWriteToAReadOnlyDocumentException();
+            var stamp = DateTime.UtcNow;
 
-            _Save(data);
+            var currentDocument = _Load();
+
+            if (currentDocument.TransactionId != null)
+            {
+                if (transactionOwned!=currentDocument.TransactionId)
+                {
+                    throw new QuickDBTryingToSaveADocumentThatIsAlreadyInATransactionException();
+                }
+            }
+           
+
+            _handleCheckIfEtagHasChangedSinceLastLoad(updatedDocument, currentDocument, throwExceptionIfThereAreChangesSinceLastLoad);
+
+            _UpdateDocumentHistory(updatedDocument, currentDocument, stamp);
+
+            var version = currentDocument.Version + 1;
+
+            return _UpdateDocumentPropertiesAndSaveToDisc(updatedDocument, version, stamp, makeReadOnly);
         }
 
-        public void TrySave(Func<ADocumentObject<TConfigurationObject>> updateDocumentActionToBeRetried, int numberOfRetries, int intervalBetweenRetries)
+        private string _UpdateDocumentPropertiesAndSaveToDisc(ADocumentObject<TClientModelObject> updatedDocument, long version, DateTime stamp, bool makeReadOnly = false)
         {
-            _TrySave(updateDocumentActionToBeRetried, numberOfRetries, intervalBetweenRetries);
+            if (updatedDocument.ReadOnlyDocument)
+                throw new QuickDBTryingToWriteToAReadOnlyDocumentException();
+
+            if (ReadOnly) throw new QuickDBTryingToWriteToAReadOnlyDocumentException();
+
+            _UpdateDocumentProperties(updatedDocument, version, stamp, makeReadOnly);
+
+            updatedDocument.Document = updatedDocument.Document.Equals(null) ? new TClientModelObject() : updatedDocument.Document;
+            var json = SerializationHandler.Serialize(updatedDocument);
+
+            if (EnableEncryption)
+                json = EncryptionHandler.EnCrypt(json);
+
+            FileAccessHandler.Save(json);
+
+            return json;
         }
 
-        public bool ReadOnly { set; get; }
-
-        public bool ThrowExceptionIfThereAreChangesSinceLastLoad { set; get; }
-
-        public int MaximumUpdateHistoryDepth { set; get; }
+        #endregion Main Load and save
     }
 }
